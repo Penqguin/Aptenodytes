@@ -1,0 +1,28 @@
+name: build-and-test
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - name: Install deps
+        run: |
+          sudo apt-get update && sudo apt-get install -y ninja-build cmake
+          pip install uv
+          uv pip install --system -e ".[dev]"
+      - name: Pytest (oracle, no C++ needed)
+        run: uv run pytest python/tests -v
+      - name: Configure C++
+        run: cmake --preset dev
+      - name: Build
+        run: cmake --build build/dev -j
+      - name: CTest
+        run: ctest --preset dev --output-on-failure
+      - name: Ruff + clang-format check
+        run: |
+          uv run ruff check python/
+          clang-format --dry-run --Werror engine/include/aptenodytes/*.h engine/src/*.cpp engine/tests/*.cpp
